@@ -17,9 +17,11 @@ print(
 )
 from timesfm.timesfm_base import freq_map, TimesFmCheckpoint, TimesFmHparams, TimesFmBase
 try:
-  print("Loaded Jax TimesFM.")
+  print("Loading Jax TimesFM...")
   from timesfm.timesfm_jax import TimesFmJax as TimesFm
   from timesfm import data_loader
+  print("Loaded Jax TimesFM.")
 except Exception as _:
-  print("Loaded PyTorch TimesFM.")
+  print("Jax not loaded, loading PyTorch TimesFM...")
   from timesfm.timesfm_torch import TimesFmTorch as TimesFm
+  print("Loaded PyTorch TimesFM.")
