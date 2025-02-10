@@ -2,13 +2,14 @@
 name = "timesfm"
 packages = [{ include = "timesfm", from = "src" }]
 description = "Open weights time-series foundation model from Google Research."
-version = "1.2.7"
+version = "1.2.8"
 authors = [
     "Rajat Sen <senrajat@google.com>",
     "Yichen Zhou <yichenzhou@google.com>",
     "Abhimanyu Das <abhidas@google.com>",
     "Petros Mol <pmol@google.com>",
     "Justin Güse <guese.justin@gmail.com>",
+    "Michael Chertushkin <chertushkinmichael@gmail.com>"
 ]
 readme = "README.md"
 keywords = ["time series", "timesfm", "forecast", "time series model"]
