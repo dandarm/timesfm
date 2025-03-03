@@ -11,7 +11,7 @@ set -e   # Se un comando va in errore, lo script si interrompe
 ##################################
 
 # Dove installiamo le librerie locali:
-INSTALL_DIR="/workspace/local"
+INSTALL_DIR="/media/fenrir/disk1/danieleda/local"
 
 # Quale versione di Python vuoi installare con pyenv:
 PYTHON_VERSION="3.10.16"
@@ -133,14 +133,14 @@ cd ..
 
 
 curl https://pyenv.run | bash
-export PYENV_ROOT="$HOME/.pyenv"
+export PYENV_ROOT="$INSTALL_DIR/.pyenv"
 [[ -d $PYENV_ROOT/bin ]] && export PATH="$PYENV_ROOT/bin:$PATH"
 eval "$(pyenv init - bash)"
 eval "$(pyenv virtualenv-init -)"
 
 
 curl -sSL https://install.python-poetry.org | python3 -
-export PATH="$HOME/.local/bin:$PATH"
+export PATH="$INSTALL_DIR/.local/bin:$PATH"
 
 ##################################
 # 5) INSTALLAZIONE PYTHON CON PYENV

@@ -13,7 +13,7 @@ import torch.distributed as dist
 import torch.nn as nn
 from torch.nn.parallel import DistributedDataParallel as DDP
 from torch.utils.data import DataLoader, Dataset
-from timesfm.pytorch_patched_decoder import create_quantiles
+from pytorch_patched_decoder import create_quantiles
 
 import wandb
 
@@ -118,7 +118,7 @@ class DistributedManager:
 
 @dataclass
 class FinetuningConfig:
-  """Configuration for model training.
+    """Configuration for model training.
 
     Args:
       batch_size: Number of samples per batch.
@@ -140,24 +140,42 @@ class FinetuningConfig:
         Can be: float (0.0-1.0): fraction of epoch (e.g., 0.5 = validate twice per epoch)
                 int: validate every N batches
     """
+    # aggiungo io
+    horizon_len: int = 10
+    batch_size: int = 32
+    num_epochs: int = 20
+    learning_rate: float = 1e-4
+    weight_decay: float = 0.01
+    freq_type: int = 0
+    use_quantile_loss: bool = False
+    quantiles: Optional[List[float]] = None
+    device: str = "cuda" if torch.cuda.is_available() else "cpu"
+    distributed: bool = False
+    gpu_ids: List[int] = field(default_factory=lambda: [0])
+    master_port: str = "12358"
+    master_addr: str = "localhost"
+    use_wandb: bool = False
+    wandb_project: str = "timesfm-finetuning"
+    log_every_n_steps: int = 50
+    val_check_interval: float = 0.5
 
-  batch_size: int = 32
-  num_epochs: int = 20
-  learning_rate: float = 1e-4
-  weight_decay: float = 0.01
-  freq_type: int = 0
-  use_quantile_loss: bool = False
-  quantiles: Optional[List[float]] = None
-  device: str = "cuda" if torch.cuda.is_available() else "cpu"
-  distributed: bool = False
-  gpu_ids: List[int] = field(default_factory=lambda: [0])
-  master_port: str = "12358"
-  master_addr: str = "localhost"
-  use_wandb: bool = False
-  wandb_project: str = "timesfm-finetuning"
-  log_every_n_steps: int = 50
-  val_check_interval: float = 0.5
 
+
+    
+class TruncatedMSELoss(nn.Module):
+    """Loss personalizzata per focalizzarsi su un orizzonte ridotto."""
+    def __init__(self, horizon: int = 10):
+        super().__init__()
+        self.horizon = horizon
+
+    def forward(self, predictions: torch.Tensor, targets: torch.Tensor) -> torch.Tensor:
+        # Seleziona solo i primi 'horizon' punti dell'output e del target
+        truncated_pred = predictions[..., :self.horizon]
+        truncated_target = targets[..., :self.horizon].squeeze(-1)
+        return torch.mean((truncated_pred - truncated_target) ** 2)
+    
+    
+    
 
 class TimesFMFinetuner:
   """Handles model training and validation.
@@ -182,13 +200,13 @@ class TimesFMFinetuner:
     self.config = config
     self.rank = rank
     self.logger = logger or logging.getLogger(__name__)
-    self.device = torch.device(
-        f"cuda:{rank}" if torch.cuda.is_available() else "cpu")
-    self.loss_fn = loss_fn or (lambda x, y: torch.mean((x - y.squeeze(-1))**2))
+    self.device = torch.device(f"cuda:{rank}" if torch.cuda.is_available() else "cpu")
+    
+    #self.loss_fn = loss_fn or (lambda x, y: torch.mean((x - y.squeeze(-1))**2))
+    self.loss_fn = TruncatedMSELoss(horizon=10) if loss_fn is None else loss_fn
 
-    if config.use_wandb:
-      self.metrics_logger = WandBLogger(config.wandb_project, config.__dict__,
-                                        rank)
+    #if config.use_wandb:
+    #  self.metrics_logger = WandBLogger(config.wandb_project, config.__dict__, rank)
 
     if config.distributed:
       self.dist_manager = DistributedManager(
@@ -243,7 +261,12 @@ class TimesFMFinetuner:
         Returns:
             Quantile loss
         """
-    dev = actual - pred
+     # Tronca pred alla lunghezza effettiva del target
+    target_length = actual.shape[1]  # Dimensione temporale del target
+    pred_truncated = pred[..., :target_length]  # <-- MODIFICA QUI
+    
+    #dev = actual - pred
+    dev = actual - pred_truncated  # <-- Usa la versione troncata
     loss_first = dev * quantile
     loss_second = -dev * (1.0 - quantile)
     return 2 * torch.where(loss_first >= 0, loss_first, loss_second)
@@ -263,7 +286,10 @@ class TimesFMFinetuner:
 
     predictions = self.model(x_context, x_padding.float(), freq)
     predictions_mean = predictions[..., 0]
-    last_patch_pred = predictions_mean[:, -1, :]
+    #last_patch_pred = predictions_mean[:, -1, :]
+    # Adatta l'output alla lunghezza effettiva del target
+    target_length = x_future.shape[1]
+    last_patch_pred = predictions_mean[:, -1, :target_length]
 
     loss = self.loss_fn(last_patch_pred, x_future.squeeze(-1))
     if self.config.use_quantile_loss:
@@ -357,11 +383,14 @@ class TimesFMFinetuner:
 
     history = {"train_loss": [], "val_loss": [], "learning_rate": []}
 
-    self.logger.info(
-        f"Starting training for {self.config.num_epochs} epochs...")
+    self.logger.info(f"Starting training for {self.config.num_epochs} epochs...")
     self.logger.info(f"Training samples: {len(train_dataset)}")
     self.logger.info(f"Validation samples: {len(val_dataset)}")
 
+    print(f"Starting training for {self.config.num_epochs} epochs...")
+    print(f"Training samples: {len(train_dataset)}")
+    print(f"Validation samples: {len(val_dataset)}")
+      
     try:
       for epoch in range(self.config.num_epochs):
         train_loss = self._train_epoch(train_loader, optimizer)
@@ -386,6 +415,7 @@ class TimesFMFinetuner:
           self.logger.info(
               f"[Epoch {epoch+1}] Train Loss: {train_loss:.4f} | Val Loss: {val_loss:.4f}"
           )
+          print(f"[Epoch {epoch+1}] Train Loss: {train_loss:.4f} | Val Loss: {val_loss:.4f}")
 
     except KeyboardInterrupt:
       self.logger.info("Training interrupted by user")
@@ -397,3 +427,5 @@ class TimesFMFinetuner:
       self.metrics_logger.close()
 
     return {"history": history}
+
+

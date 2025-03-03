@@ -6,3 +6,11 @@ wandb/
 datasets/
 results/
 timesfm_jax.egg-info/
+*.sh
+utile.txt
+*.pkl
+*.csv
+*.ipynb_checkpoints*
+ettm1_finetune/
+sinus500
+Untitled*.ipynb

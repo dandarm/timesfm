@@ -17,7 +17,7 @@ with zipfile.ZipFile('all_six_datasets.zip', 'r') as zip_ref:
     
     
 wget https://developer.download.nvidia.com/compute/cuda/11.2.0/local_installers/cuda_11.2.0_460.27.04_linux.run
-./cuda_11.2.0_460.27.04_linux.run --toolkit --installpath=/workspace/cuda-11.2
+./cuda_11.2.0_460.27.04_linux.run --toolkit --installpath=/media/fenrir/disk1/danieleda/local/cuda-11.2
 
 
 
@@ -32,6 +32,10 @@ poetry install -E  pax
 
 export LD_LIBRARY_PATH="/workspace/cuda-11.2/lib64:$LD_LIBRARY_PATH"
 
+
+se installo con pip ivece che pyenv
+pip install paxml
+pip install --upgrade "jax[cuda12]"==0.4.26
 
 
 poetry run python -m ipykernel install --user --name "poetry_timesfm" --display-name "Poetry (timesfm)"

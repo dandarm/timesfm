@@ -2,6 +2,16 @@ import os
 os.environ['XLA_PYTHON_CLIENT_PREALLOCATE'] = 'false'
 os.environ['JAX_PMAP_USE_TENSORSTORE'] = 'false'
 
+import tensorflow as tf
+gpus = tf.config.experimental.list_physical_devices('GPU')
+if gpus:
+    try:
+        for gpu in gpus:
+            print('=== setting gpu memory growth to True for gpu: ', gpu)
+            tf.config.experimental.set_memory_growth(gpu, True) 
+    except RuntimeError as e:
+        print(e)
+        
 import timesfm
 import gc
 import numpy as np
@@ -22,14 +32,14 @@ timesfm_backend = "gpu"  # @param
 tfm = timesfm.TimesFm(
       hparams=timesfm.TimesFmHparams(
           backend=timesfm_backend,
-          per_core_batch_size=2,
-          horizon_len=16,
+          per_core_batch_size=32,
+          horizon_len=128,
           num_layers=50,
           # Se this to True for v1.0 checkpoints
           use_positional_embedding=False,
           # Note that we could set this to as high as 2048 but keeping it 512 here so that
           # both v1.0 and 2.0 checkpoints work
-          context_len=64,
+          context_len=512,
       ),
       checkpoint=timesfm.TimesFmCheckpoint(
           huggingface_repo_id="google/timesfm-2.0-500m-jax"),
@@ -56,11 +66,11 @@ ts_cols = [col for col in data_df.columns if col != "date"]
 num_cov_cols = None
 cat_cov_cols = None
 
-context_len = 64
-pred_len = 16
+context_len = 512
+pred_len = 128
 
 num_ts = len(ts_cols)
-batch_size = 2
+batch_size = 64
 
 dtl = data_loader.TimeSeriesdata(
       data_path=data_path,
@@ -256,9 +266,9 @@ replicated_jax_vars = replicated_jax_states.mdl_vars
 best_eval_loss = 1e7
 step_count = 0
 patience = 0
-NUM_EPOCHS = 100
+NUM_EPOCHS = 5
 PATIENCE = 5
-TRAIN_STEPS_PER_EVAL = 1000
+TRAIN_STEPS_PER_EVAL = 100
 CHECKPOINT_DIR='./ettm1_finetune'
 
 
